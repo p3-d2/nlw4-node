@@ -3,6 +3,8 @@ import { getCustomRepository } from "typeorm";
 import { UsersRepository } from "../repositories/UsersRepository";
 import * as yup from "yup";
 
+import { AppError } from "../errors/AppError";
+
 class UserController {
   async create(req: Request, res: Response) {
     const { name, email } = req.body;
@@ -12,8 +14,11 @@ class UserController {
       email: yup.string().email().required(),
     });
 
-    if (!(await schema.isValid(req.body)))
-      return res.status(400).json({ error: "Validation Failed!" });
+    try {
+      await schema.validate(req.body, { abortEarly: false });
+    } catch (err) {
+      throw new AppError(err);
+    }
 
     const userRepository = getCustomRepository(UsersRepository);
 
@@ -21,11 +26,7 @@ class UserController {
       email,
     });
 
-    if (userAlreadyExists) {
-      return res.status(400).json({
-        error: "user already exists!",
-      });
-    }
+    if (userAlreadyExists) throw new AppError("user already exists!");
 
     const user = userRepository.create({
       name,
